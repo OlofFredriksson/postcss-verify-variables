@@ -19,6 +19,21 @@ describe("verifyVars", () => {
         );
     });
 
+    it("allows variables defined in the html selector", async () => {
+        const css =
+            "html { --text-color: black; } .component { color: var(--text-color); }";
+
+        const result = await processCss(css);
+
+        expect(result.css).toBe(css);
+    });
+
+    it("rejects undefined references within the html selector", async () => {
+        await expect(
+            processCss("html { --text-color: var(--missing); }"),
+        ).rejects.toThrow("--missing");
+    });
+
     it("rejects an undefined variable and reports its declaration", async () => {
         await expect(
             processCss(".component { color: var(--missing); }"),
