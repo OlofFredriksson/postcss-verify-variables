@@ -1,5 +1,6 @@
 import postcss from "postcss";
 import { compileAsync } from "sass";
+
 import { verifyVars } from "post-css-verify";
 
 const input = process.argv[2];
