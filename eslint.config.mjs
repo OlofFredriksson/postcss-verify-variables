@@ -20,4 +20,10 @@ export default [
         files: ["**/*.ts"],
         rules: { "import-x/extensions": "off" },
     },
+
+    {
+        name: "Integration build imports generated package",
+        files: ["src/int-test/build.mjs"],
+        linterOptions: { reportUnusedDisableDirectives: "off" },
+    },
 ];

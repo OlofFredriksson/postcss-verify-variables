@@ -1,6 +1,7 @@
 import postcss from "postcss";
 import { compileAsync } from "sass";
 
+// eslint-disable-next-line import-x/no-unresolved, import-x/order -- The package is built before integration tests.
 import { verifyVars } from "post-css-verify";
 
 const input = process.argv[2];
