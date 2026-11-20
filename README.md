@@ -62,3 +62,9 @@ export default {
 ```
 
 `ignore` is optional and defaults to an empty list. A variable in this list is allowed even if it is not declared in the processed CSS. All other undefined references cause the build to fail with a PostCSS error that includes the source location when available.
+
+## Development
+
+Run `npm test` for lint and unit tests. Run `npm run integration-test` to build the plugin and run the Sass and PostCSS integration tests. Add future Vitest integration tests as `*.test.ts` files in `src/int-test`; they can reuse `src/int-test/build.mjs` and use their own Sass fixtures.
+
+CI checks the build on Linux and runs the tests on Linux and Windows. The integration tests build the package on each test runner.

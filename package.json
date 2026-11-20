@@ -30,6 +30,7 @@
     "build": "node build.mjs",
     "eslint": "eslint --cache .",
     "eslint:fix": "eslint --fix .",
+    "integration-test": "vitest run --mode integration",
     "lint": "npm run eslint && npm run prettier:check",
     "lint:fix": "npm run eslint:fix && npm run prettier:write",
     "prepare": "commitlint-config",
@@ -39,6 +40,7 @@
     "test": "vitest run"
   },
   "allowScripts": {
+    "@parcel/watcher": false,
     "unrs-resolver": true
   },
   "commitlint": {
@@ -58,6 +60,7 @@
     "@typescript/native": "npm:typescript@7.0.2",
     "npm-pkg-lint": "5.5.0",
     "postcss": "^8.5.33",
+    "sass": "1.108.2",
     "tsdown": "0.23.7",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "vitest": "5.1.0"
