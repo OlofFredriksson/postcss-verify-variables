@@ -1,0 +1,25 @@
+{
+  "name": "vite-sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "e2e": "start-server-and-test \"vite preview --host 127.0.0.1 --port 4173 --strictPort\" http://127.0.0.1:4173 \"cypress run\"",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fkui/design": "6.65.1",
+    "@fkui/theme-default": "6.65.0",
+    "@fkui/vue": "6.65.1",
+    "vue": "3.5.45"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.11",
+    "cypress": "16.3.0",
+    "postcss-verify-variables": "file:..",
+    "start-server-and-test": "3.0.13",
+    "vite": "8.3.8"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "name": "postcss-verify-variables",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Verify CSS custom property references with PostCSS",
+  "keywords": [
+    "Utility"
+  ],
+  "homepage": "https://github.com/OlofFredriksson/postcss-verify-variables",
+  "bugs": "https://github.com/OlofFredriksson/postcss-verify-variables/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OlofFredriksson/postcss-verify-variables.git"
+  },
+  "license": "MIT",
+  "author": "Olof",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.mts",
+      "default": "./dist/vite.mjs"
+    }
+  },
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "workspaces": [
+    "vite-sandbox"
+  ],
+  "scripts": {
+    "build": "npm run build:plugin && npm run build --workspace vite-sandbox",
+    "prebuild:plugin": "tsc",
+    "build:plugin": "node build.mjs",
+    "eslint": "eslint --cache .",
+    "eslint:fix": "eslint --fix .",
+    "integration-test": "vitest run --mode integration",
+    "lint": "npm run eslint && npm run prettier:check",
+    "lint:fix": "npm run eslint:fix && npm run prettier:write",
+    "prepare": "commitlint-config",
+    "prettier:check": "prettier --check .",
+    "prettier:write": "prettier --write .",
+    "pretest": "npm run lint",
+    "test": "vitest run"
+  },
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "cypress": false,
+    "unrs-resolver": true
+  },
+  "commitlint": {
+    "extends": "@forsakringskassan/commitlint-config/no-jira"
+  },
+  "prettier": "@forsakringskassan/prettier-config",
+  "release": {
+    "extends": "@forsakringskassan/semantic-release-config"
+  },
+  "devDependencies": {
+    "@forsakringskassan/commitlint-config": "4.2.8",
+    "@forsakringskassan/eslint-config": "15.13.18",
+    "@forsakringskassan/eslint-config-typescript": "15.13.15",
+    "@forsakringskassan/eslint-config-vue": "15.13.15",
+    "@forsakringskassan/prettier-config": "3.7.15",
+    "@tsconfig/node22": "22.0.7",
+    "@types/node": "22.20.5",
+    "@typescript/native": "npm:typescript@7.0.2",
+    "npm-pkg-lint": "5.5.0",
+    "postcss": "^8.5.33",
+    "sass": "1.108.2",
+    "tsdown": "0.23.7",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  },
+  "peerDependencies": {
+    "postcss": "^8.5.0",
+    "vite": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": "^22.16 || >= 24.15",
+    "npm": ">=11.0.0"
+  }
+}

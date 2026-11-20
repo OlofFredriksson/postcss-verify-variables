@@ -1,0 +1,9 @@
+$spacing: 8px;
+
+.button {
+    color: var(--text-color);
+
+    &:hover {
+        padding: $spacing;
+    }
+}
