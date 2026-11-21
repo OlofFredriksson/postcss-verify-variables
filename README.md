@@ -37,6 +37,23 @@ console.log(result.css);
 
 An undefined reference causes PostCSS processing to fail with an error identifying the variable and declaration. For example, `color: var(--missing)` fails unless `--missing` is declared or ignored.
 
+### Vite
+
+Add the plugin to `css.postcss.plugins` in your Vite configuration:
+
+```js
+import { defineConfig } from "vite";
+import { verifyVars } from "post-css-verify";
+
+export default defineConfig({
+    css: {
+        postcss: {
+            plugins: [verifyVars()],
+        },
+    },
+});
+```
+
 ## What is checked
 
 The plugin checks `var(--name)` references in declaration values against custom properties declared anywhere in the processed PostCSS root or in the [`global`](#global-compiled-css) option. Variables listed in [`ignore`](#ignoring-variables) are also allowed.
