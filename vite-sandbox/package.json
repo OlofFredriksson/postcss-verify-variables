@@ -1,0 +1,17 @@
+{
+  "name": "vite-sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm run build --prefix ..",
+    "build": "vite build",
+    "predev": "npm run build --prefix ..",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "postcss-verify-variables": "file:..",
+    "vite": "8.3.8"
+  }
+}

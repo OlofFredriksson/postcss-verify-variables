@@ -29,6 +29,9 @@
   "files": [
     "dist"
   ],
+  "workspaces": [
+    "vite-sandbox"
+  ],
   "scripts": {
     "prebuild": "tsc",
     "build": "node build.mjs",

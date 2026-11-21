@@ -1,0 +1,11 @@
+body {
+    background: var(--background);
+    color: var(--text-color);
+    font-family: sans-serif;
+}
+
+main {
+    margin: 4rem auto;
+    max-width: 40rem;
+    padding: 0 1rem;
+}
