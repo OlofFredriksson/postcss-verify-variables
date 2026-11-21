@@ -42,7 +42,12 @@ test("compiles Sass modules and verifies the resulting CSS", async () => {
 test("fails the build for an undefined variable in compiled Sass", async () => {
     await expect(runBuild("invalid")).rejects.toMatchObject({
         stderr: expect.stringContaining(
-            'Odefinierad CSS-variabel: "--missing-color" används i "color", men saknas i den byggda CSS-filen.',
+            [
+                'CSS variable "--missing-color" referenced in "color" could not be verified.',
+                'It is not declared in the processed CSS or "global" and is not listed in "ignore".',
+                "Declare the variable in the processed CSS.",
+                'If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore".',
+            ].join("\n"),
         ),
     });
 });

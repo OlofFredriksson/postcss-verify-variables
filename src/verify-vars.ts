@@ -59,7 +59,12 @@ function verifyVars(opts: VerifyOptions = {}): Plugin {
 
                     if (!definedVars.has(varName) && !ignore.has(varName)) {
                         throw decl.error(
-                            `Odefinierad CSS-variabel: "${varName}" används i "${decl.prop}", men saknas i den byggda CSS-filen.`,
+                            [
+                                `CSS variable "${varName}" referenced in "${decl.prop}" could not be verified.`,
+                                'It is not declared in the processed CSS or "global" and is not listed in "ignore".',
+                                "Declare the variable in the processed CSS.",
+                                'If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore".',
+                            ].join("\n"),
                             { word: varName },
                         );
                     }

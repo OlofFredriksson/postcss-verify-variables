@@ -37,9 +37,14 @@ describe("verifyVars", () => {
     it("rejects an undefined variable and reports its declaration", async () => {
         await expect(
             processCss(".component { color: var(--missing); }"),
-        ).rejects.toThrow(
-            'Odefinierad CSS-variabel: "--missing" används i "color", men saknas i den byggda CSS-filen.',
-        );
+        ).rejects.toMatchObject({
+            reason: [
+                'CSS variable "--missing" referenced in "color" could not be verified.',
+                'It is not declared in the processed CSS or "global" and is not listed in "ignore".',
+                "Declare the variable in the processed CSS.",
+                'If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore".',
+            ].join("\n"),
+        });
     });
 
     it("allows undefined variables listed in ignore", async () => {
