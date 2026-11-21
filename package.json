@@ -49,6 +49,7 @@
   },
   "allowScripts": {
     "@parcel/watcher": false,
+    "cypress": false,
     "unrs-resolver": true
   },
   "commitlint": {

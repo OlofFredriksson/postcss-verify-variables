@@ -18,6 +18,18 @@ export default [
     vueConfig(),
 
     {
+        name: "Cypress test globals",
+        files: ["vite-sandbox/cypress/**/*.cy.js"],
+        languageOptions: {
+            globals: {
+                cy: "readonly",
+                describe: "readonly",
+                it: "readonly",
+            },
+        },
+    },
+
+    {
         name: "Node Native test runner requires file extensions",
         files: ["**/*.ts"],
         rules: { "import-x/extensions": "off" },

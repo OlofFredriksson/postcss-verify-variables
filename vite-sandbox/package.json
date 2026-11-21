@@ -9,6 +9,8 @@
     "build:only": "vite build",
     "predev": "npm run build:plugin --prefix ..",
     "dev": "vite",
+    "pree2e": "npm run build && cypress install",
+    "e2e": "start-server-and-test \"vite preview --host 127.0.0.1 --port 4173 --strictPort\" http://127.0.0.1:4173 \"cypress run\"",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,7 +21,9 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.11",
+    "cypress": "16.3.0",
     "postcss-verify-variables": "file:..",
+    "start-server-and-test": "3.0.13",
     "vite": "8.3.8"
   }
 }
