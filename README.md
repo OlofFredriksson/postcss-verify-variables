@@ -39,20 +39,18 @@ An undefined reference causes PostCSS processing to fail with an error identifyi
 
 ### Vite
 
-Add the plugin to `css.postcss.plugins` in your Vite configuration:
+With Vite, use the Vite plugin instead of the PostCSS plugin to check the combined CSS output. For Vite 8, add it to your configuration:
 
 ```js
 import { defineConfig } from "vite";
-import { verifyVars } from "postcss-verify-variables";
+import { verifyVarsVite } from "postcss-verify-variables/vite";
 
 export default defineConfig({
-    css: {
-        postcss: {
-            plugins: [verifyVars()],
-        },
-    },
+    plugins: [verifyVarsVite()],
 });
 ```
+
+The Vite plugin checks generated CSS assets together after bundling, rather than checking each CSS module separately. It runs only during builds; CSS is not verified by the development server.
 
 ## What is checked
 

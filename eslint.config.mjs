@@ -23,7 +23,7 @@ export default [
 
     {
         name: "Integration build imports generated package",
-        files: ["src/int-test/build.mjs"],
+        files: ["src/int-test/build.mjs", "src/int-test/vite.test.ts"],
         linterOptions: { reportUnusedDisableDirectives: "off" },
     },
 ];

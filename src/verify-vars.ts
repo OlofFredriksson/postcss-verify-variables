@@ -3,7 +3,7 @@ import { type Plugin, type Root, parse } from "postcss";
 /**
  * Configuration options for postcss-verify-variables-vars.
  */
-interface VerifyOptions {
+export interface VerifyOptions {
     /**
      * Variable names that are allowed without being defined in the processed CSS.
      * Specify each name exactly, including the `--` prefix.
