@@ -64,6 +64,14 @@ describe("verifyVars", () => {
         expect(result.css).toBe(".component { color: var(--global-color); }");
     });
 
+    it("does not check undefined variable references in global CSS", async () => {
+        const result = await processCss(".component { color: red; }", {
+            global: ":root { color: var(--missing); }",
+        });
+
+        expect(result.css).toBe(".component { color: red; }");
+    });
+
     it.each(["/* --missing: red; */", ':root { content: "--missing: red;"; }'])(
         "does not treat non-declarations in global CSS as variables: %s",
         async (global) => {
