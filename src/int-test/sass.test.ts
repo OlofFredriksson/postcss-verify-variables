@@ -55,16 +55,25 @@ test("finds variables declared in deeply nested Sass modules", async () => {
 });
 
 test("fails the build for an undefined variable in compiled Sass", async () => {
-    await expect(runBuild("invalid")).rejects.toMatchObject({
-        stderr: expect.stringContaining(
-            [
-                'CSS variable "--missing-color" referenced in "color" could not be verified.',
-                'It is not declared in the processed CSS or "global" and is not listed in "ignore".',
-                "Declare the variable in the processed CSS.",
-                'If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore".',
-            ].join("\n"),
-        ),
-    });
+    let stderr: string | undefined;
+    try {
+        await runBuild("invalid");
+    } catch (error) {
+        // @ts-expect-error execFile errors contain stderr.
+        stderr = error.stderr;
+    }
+
+    // @ts-expect-error execFile errors contain stderr.
+    const message = stderr
+        .replaceAll("\r\n", "\n")
+        .match(/CSS variable "--missing-color"[^\n]*(?:\n[^\n]*){3}/)?.[0];
+
+    expect(message).toMatchInlineSnapshot(`
+      "CSS variable "--missing-color" referenced in "color" could not be verified.
+      It is not declared in the processed CSS or "global" and is not listed in "ignore".
+      Declare the variable in the processed CSS.
+      If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore"."
+    `);
 });
 
 test("allows variables declared in already compiled global CSS", async () => {
