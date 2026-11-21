@@ -54,7 +54,7 @@ The Vite plugin checks generated CSS assets together after bundling, rather than
 
 ### Vite sandbox
 
-The `vite-sandbox` npm workspace demonstrates the Vite plugin using variables declared in a separate CSS file. From the repository root, run:
+The `vite-sandbox` npm workspace demonstrates the Vite plugin with a Vue button from `@fkui/vue`, the `@fkui/design` styles and `@fkui/theme-default`. It also uses variables declared in a separate CSS file. From the repository root, run:
 
 ```sh
 npm install
