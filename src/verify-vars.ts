@@ -1,11 +1,19 @@
-import type { PluginCreator } from "postcss";
+import type { Plugin } from "postcss";
 
-// postcss-verify-vars.js
+/**
+ * Configuration options for postcss-verify-vars.
+ */
 interface VerifyOptions {
+    /**
+     * Variable names that are allowed without being defined in the processed CSS.
+     * Specify each name exactly, including the `--` prefix.
+     *
+     * @defaultValue `[]`
+     */
     ignore?: string[];
 }
 
-const verifyVars: PluginCreator<VerifyOptions> = (opts = {}) => {
+function verifyVars(opts: VerifyOptions = {}): Plugin {
     const ignore = new Set(opts.ignore || []);
 
     return {
@@ -40,7 +48,7 @@ const verifyVars: PluginCreator<VerifyOptions> = (opts = {}) => {
             });
         },
     };
-};
+}
 
 verifyVars.postcss = true;
 
