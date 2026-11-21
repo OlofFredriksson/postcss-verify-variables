@@ -3,12 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type InlineConfig, build, createServer } from "vite";
-import { expect, test } from "vitest";
 
 // eslint-disable-next-line import-x/no-unresolved, import-x/order -- The package is built before integration tests.
 import { verifyVars } from "postcss-verify-variables";
 // eslint-disable-next-line import-x/no-unresolved, import-x/order -- The package is built before integration tests.
 import { verifyVarsVite } from "postcss-verify-variables/vite";
+import { expect, test } from "vitest";
 
 const fixtureRoot = fileURLToPath(
     new URL("vite-boilerplate-app", import.meta.url),

@@ -39,7 +39,7 @@ An undefined reference causes PostCSS processing to fail with an error identifyi
 
 ### Vite
 
-With Vite, use the Vite plugin instead of the PostCSS plugin to check the combined CSS output. For Vite 8, add it to your configuration:
+Vite runs PostCSS on CSS modules separately, so the PostCSS plugin may report variables declared in another module as missing. Use the Vite plugin to check the combined CSS output instead. For Vite, add it to your configuration:
 
 ```js
 import { defineConfig } from "vite";
