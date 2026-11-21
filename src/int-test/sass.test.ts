@@ -55,18 +55,15 @@ test("finds variables declared in deeply nested Sass modules", async () => {
 });
 
 test("fails the build for an undefined variable in compiled Sass", async () => {
-    let stderr: string | undefined;
+    let message: string | undefined;
     try {
         await runBuild("invalid");
     } catch (error) {
         // @ts-expect-error execFile errors contain stderr.
-        stderr = error.stderr;
+        message = error.stderr
+            .replaceAll("\r\n", "\n")
+            .match(/CSS variable "--missing-color"[^\n]*(?:\n[^\n]*){3}/)?.[0];
     }
-
-    // @ts-expect-error execFile errors contain stderr.
-    const message = stderr
-        .replaceAll("\r\n", "\n")
-        .match(/CSS variable "--missing-color"[^\n]*(?:\n[^\n]*){3}/)?.[0];
 
     expect(message).toMatchInlineSnapshot(`
       "CSS variable "--missing-color" referenced in "color" could not be verified.
