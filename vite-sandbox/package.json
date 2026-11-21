@@ -4,11 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:only",
-    "build:only": "vite build",
-    "predev": "npm run build:plugin --prefix ..",
+    "build": "vite build",
     "dev": "vite",
-    "pree2e": "npm run build && cypress install",
     "e2e": "start-server-and-test \"vite preview --host 127.0.0.1 --port 4173 --strictPort\" http://127.0.0.1:4173 \"cypress run\"",
     "preview": "vite preview"
   },

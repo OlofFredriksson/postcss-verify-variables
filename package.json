@@ -33,7 +33,7 @@
     "vite-sandbox"
   ],
   "scripts": {
-    "build": "npm run build:plugin && npm run build:only --workspace vite-sandbox",
+    "build": "npm run build:plugin && npm run build --workspace vite-sandbox",
     "prebuild:plugin": "tsc",
     "build:plugin": "node build.mjs",
     "eslint": "eslint --cache .",

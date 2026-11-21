@@ -59,13 +59,15 @@ The `vite-sandbox` npm workspace demonstrates the Vite plugin with a Vue button 
 
 ```sh
 npm install
+npm run build:plugin
 npm run dev --workspace vite-sandbox
 npm run build --workspace vite-sandbox
+npm exec --workspace vite-sandbox -- cypress install
 npm run e2e --workspace vite-sandbox
 ```
 
-The sandbox commands build the local plugin first. The root `npm run build` also builds the sandbox to verify CSS variables; the development server does not perform verification.
-The Cypress end-to-end command builds the sandbox, installs the Cypress binary if needed, and tests the production preview.
+Build the local plugin before running the sandbox commands. The root `npm run build` also builds the sandbox to verify CSS variables; the development server does not perform verification.
+The Cypress end-to-end command tests the production preview; build the sandbox and install the Cypress binary first.
 
 =======
 
