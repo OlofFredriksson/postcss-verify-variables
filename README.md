@@ -70,16 +70,10 @@ To check variables across files, place this plugin after plugins that import or 
 
 Use `ignore` for variables supplied at runtime or by CSS outside the processed root. Provide exact names, including the `--` prefix:
 
-```js
-import { verifyVars } from "postcss-verify-variables";
-
-export default {
-    plugins: [
-        verifyVars({
-            ignore: ["--runtime-color", "--host-theme"],
-        }),
-    ],
-};
+```diff
+verifyVars({
++   ignore: ["--runtime-color", "--host-theme"],
+})
 ```
 
 `ignore` is optional and defaults to an empty list.
@@ -88,16 +82,10 @@ export default {
 
 Use `global` to provide compiled CSS whose variables will be available in the final build:
 
-```js
-import { verifyVars } from "postcss-verify-variables";
-
-export default {
-    plugins: [
-        verifyVars({
-            global: ":root { --runtime-color: black; --host-theme: white; }",
-        }),
-    ],
-};
+```diff
+verifyVars({
++   global: ":root { --runtime-color: black; --host-theme: white; }",
+}),
 ```
 
 `global` is optional and defaults to an empty string. It must contain valid CSS. Its custom property declarations count as defined, but text in comments or strings does not. References inside `global` itself are not checked.
