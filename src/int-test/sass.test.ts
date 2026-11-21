@@ -3,25 +3,57 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
 
-function runBuild(name: string): Promise<{ stdout: string; stderr: string }> {
+function runBuild(
+    name: string,
+    globalFile?: string,
+): Promise<{ stdout: string; stderr: string }> {
     const run = promisify(execFile);
     const build = fileURLToPath(new URL("build.mjs", import.meta.url));
     const fixture = fileURLToPath(
         new URL(`sass/${name}.scss`, import.meta.url),
     );
-    return run(process.execPath, [build, fixture]);
+    const args = [build, fixture];
+    if (globalFile) {
+        args.push(
+            fileURLToPath(new URL(`sass/${globalFile}`, import.meta.url)),
+        );
+    }
+    return run(process.execPath, args);
 }
 
 test("compiles Sass modules and verifies the resulting CSS", async () => {
     const { stdout } = await runBuild("valid");
 
-    expect(stdout).toMatch(/--text-color:\s*#123456/);
-    expect(stdout).toMatch(/\.button\s*\{[^}]*color:\s*var\(--text-color\)/);
-    expect(stdout).toMatch(/\.button:hover\s*\{[^}]*padding:\s*8px/);
+    expect(stdout).toMatchInlineSnapshot(`
+      ":root {
+        --text-color: #123456;
+      }
+
+      .button {
+        color: var(--text-color);
+      }
+      .button:hover {
+        padding: 8px;
+      }
+      "
+    `);
 });
 
 test("fails the build for an undefined variable in compiled Sass", async () => {
     await expect(runBuild("invalid")).rejects.toMatchObject({
-        stderr: /Odefinierad CSS-variabel: "--missing-color"/,
+        stderr: expect.stringContaining(
+            'Odefinierad CSS-variabel: "--missing-color" används i "color", men saknas i den byggda CSS-filen.',
+        ),
     });
+});
+
+test("allows variables declared in already compiled global CSS", async () => {
+    const { stdout } = await runBuild("global", "global.css");
+
+    expect(stdout).toMatchInlineSnapshot(`
+      ".button {
+        color: var(--global-color);
+      }
+      "
+    `);
 });

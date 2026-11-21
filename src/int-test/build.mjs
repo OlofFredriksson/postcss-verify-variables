@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import postcss from "postcss";
 import { compileAsync } from "sass";
 
@@ -9,6 +10,12 @@ if (!input) {
     throw new Error("Provide a Sass entry file.");
 }
 
+const globalFile = process.argv[3];
+const globalCss = globalFile ? await readFile(globalFile, "utf8") : undefined;
+
 const sass = await compileAsync(input);
-const result = await postcss([verifyVars()]).process(sass.css, { from: input });
+const result = await postcss([verifyVars({ global: globalCss })]).process(
+    sass.css,
+    { from: input },
+);
 process.stdout.write(`${result.css}\n`);

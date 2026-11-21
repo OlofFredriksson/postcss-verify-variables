@@ -1,4 +1,4 @@
-import type { Plugin } from "postcss";
+import { type Plugin, type Root, parse } from "postcss";
 
 /**
  * Configuration options for postcss-verify-vars.
@@ -11,22 +11,41 @@ interface VerifyOptions {
      * @defaultValue `[]`
      */
     ignore?: string[];
+
+    /**
+     * Already compiled global CSS containing variables that are provided at the
+     * final build stage. Variables declared in this string are allowed in the
+     * processed CSS even if they are not declared in the PostCSS root.
+     * The string must be valid CSS.
+     *
+     * @defaultValue `""`
+     */
+    global?: string;
+}
+
+function collectDefinedVars(root: Root, definedVars: Set<string>): void {
+    root.walkDecls((decl) => {
+        if (decl.prop.startsWith("--")) {
+            definedVars.add(decl.prop);
+        }
+    });
 }
 
 function verifyVars(opts: VerifyOptions = {}): Plugin {
     const ignore = new Set(opts.ignore || []);
+    const globalDefinedVars = new Set<string>();
+    if (opts.global !== undefined) {
+        collectDefinedVars(
+            parse(opts.global, { from: undefined }),
+            globalDefinedVars,
+        );
+    }
 
     return {
         postcssPlugin: "postcss-verify-vars",
         Once(root) {
-            const definedVars = new Set();
-
-            // Steg 1: Samla in alla definierade variabler i hela CSS-klumpen
-            root.walkDecls((decl) => {
-                if (decl.prop.startsWith("--")) {
-                    definedVars.add(decl.prop);
-                }
-            });
+            const definedVars = new Set(globalDefinedVars);
+            collectDefinedVars(root, definedVars);
 
             // Steg 2: Kontrollera alla var(--namn)
             root.walkDecls((decl) => {

@@ -63,8 +63,20 @@ export default {
 
 `ignore` is optional and defaults to an empty list. A variable in this list is allowed even if it is not declared in the processed CSS. All other undefined references cause the build to fail with a PostCSS error that includes the source location when available.
 
-## Development
+## Global compiled CSS
 
-Run `npm test` for lint and unit tests. Run `npm run integration-test` to build the plugin and run the Sass and PostCSS integration tests. Add future Vitest integration tests as `*.test.ts` files in `src/int-test`; they can reuse `src/int-test/build.mjs` and use their own Sass fixtures.
+Use `global` when variables are declared in CSS that is compiled and combined only at the final build stage. Variable declarations in this string are treated as already defined:
 
-CI checks the build on Linux and runs the tests on Linux and Windows. The integration tests build the package on each test runner.
+```js
+import { verifyVars } from "post-css-verify";
+
+export default {
+    plugins: [
+        verifyVars({
+            global: ":root { --runtime-color: black; --host-theme: white; }",
+        }),
+    ],
+};
+```
+
+`global` is optional and must contain valid CSS. Variables declared there are treated as defined, including in fallbacks; comments and strings do not count as declarations. References inside `global` are not checked. Other undefined variables must be listed in `ignore`.

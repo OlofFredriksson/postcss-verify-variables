@@ -4,7 +4,7 @@ import verifyVars from "./verify-vars.ts";
 
 const processCss = async (
     css: string,
-    options?: { ignore?: string[] },
+    options?: { ignore?: string[]; global?: string },
 ): Promise<Result> =>
     postcss([verifyVars(options)]).process(css, { from: undefined });
 
@@ -51,6 +51,34 @@ describe("verifyVars", () => {
         );
 
         expect(result.css).toBe(".component { color: var(--external); }");
+    });
+
+    it("allows variables declared in the global CSS", async () => {
+        const result = await processCss(
+            ".component { color: var(--global-color); }",
+            {
+                global: ":root { --global-color: rebeccapurple; }",
+            },
+        );
+
+        expect(result.css).toBe(".component { color: var(--global-color); }");
+    });
+
+    it.each(["/* --missing: red; */", ':root { content: "--missing: red;"; }'])(
+        "does not treat non-declarations in global CSS as variables: %s",
+        async (global) => {
+            await expect(
+                processCss(".component { color: var(--missing); }", { global }),
+            ).rejects.toThrow("--missing");
+        },
+    );
+
+    it("rejects malformed global CSS", async () => {
+        await expect(
+            processCss(".component { color: red; }", {
+                global: ":root { --color: red;",
+            }),
+        ).rejects.toThrow("Unclosed block");
     });
 
     it("treats the var() function name case-insensitively", async () => {
