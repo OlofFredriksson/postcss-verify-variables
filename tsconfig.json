@@ -5,11 +5,12 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
+        "types": ["node", "vite/client"],
         "paths": {
             "postcss-verify-variables": ["./src/index.ts"],
             "postcss-verify-variables/vite": ["./src/vite.ts"]
         }
     },
-    "include": ["src/**/*"],
+    "include": ["src/**/*", "vite-sandbox/src/**/*"],
     "exclude": ["node_modules", "dist"]
 }
