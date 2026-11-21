@@ -1,8 +1,8 @@
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type InlineConfig, build, createServer } from "vite";
+import { type InlineConfig, build, createServer, normalizePath } from "vite";
 import { expect, test, vi } from "vitest";
 
 // eslint-disable-next-line import-x/no-unresolved -- The package is built before integration tests.
@@ -69,7 +69,7 @@ async function withDevServer(
             plugins: [verifyVarsVite(options), ...plugins],
         });
         await server.listen();
-        await run(server, root);
+        await run(server, await realpath(root));
     } finally {
         try {
             await server?.close();
@@ -189,7 +189,7 @@ test("Vite warns about undefined variables without failing development transform
                 'CSS variable "--missing"',
             );
             const message = expect.stringContaining('CSS variable "--missing"');
-            const file = join(root, "invalid.css");
+            const file = normalizePath(join(root, "invalid.css"));
             const loc = { file, line: 2, column: 16 };
             const error = expect.objectContaining({ message, id: file, loc });
             const payload = expect.objectContaining({
@@ -242,7 +242,7 @@ test("Vite verifies compiled Sass, including imported partials, with other style
             'CSS variable "--sass-missing"',
         );
         const error = expect.objectContaining({
-            id: join(root, "entry.scss"),
+            id: normalizePath(join(root, "entry.scss")),
             loc: undefined,
             message: expect.stringContaining("(processed CSS:2:14)"),
         });
@@ -324,7 +324,7 @@ test.each([
     await withDevServer({}, async (server, root) => {
         await connectDevClient(server);
         await writeFile(join(root, "first.css"), first);
-        const second = join(root, "second.css");
+        const second = normalizePath(join(root, "second.css"));
         await writeFile(second, ".second {\n    color: var(--missing);\n}\n");
 
         const warn = vi.spyOn(server.config.logger, "warn");
@@ -362,7 +362,7 @@ test("Vite replays active CSS errors to reconnecting clients until fixed", async
         const reconnected = await connectDevClient(server);
         const error = expect.objectContaining({
             message: expect.stringContaining('CSS variable "--missing"'),
-            id: join(root, "invalid.css"),
+            id: normalizePath(join(root, "invalid.css")),
         });
         const payload = expect.objectContaining({ type: "error", err: error });
         await vi.waitFor(() => {
