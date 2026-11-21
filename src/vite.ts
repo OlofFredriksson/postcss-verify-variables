@@ -1,5 +1,5 @@
-import type { Plugin } from "vite";
-import postcss from "postcss";
+import type { ErrorPayload, Plugin } from "vite";
+import postcss, { CssSyntaxError } from "postcss";
 import verifyVars, { type VerifyOptions } from "./verify-vars.ts";
 
 function verifyOutput(options: VerifyOptions): Plugin {
@@ -40,6 +40,24 @@ function verifyOutput(options: VerifyOptions): Plugin {
     };
 }
 
+function sourceLocation(
+    error: CssSyntaxError,
+    styles: Array<[string, string]>,
+): ErrorPayload["err"]["loc"] {
+    if (!error.input) {
+        return;
+    }
+
+    let line = error.input.line;
+    for (const [file, css] of styles) {
+        const lines = (css.match(/\n/g)?.length ?? 0) + 1;
+        if (line <= lines) {
+            return { file, line, column: error.input.column };
+        }
+        line -= lines + 1;
+    }
+}
+
 function verifyDevelopment(options: VerifyOptions): Plugin {
     const styles = new Map<string, string>();
     let scheduleVerification: (() => void) | undefined;
@@ -47,10 +65,9 @@ function verifyDevelopment(options: VerifyOptions): Plugin {
     return {
         name: "verify-variables:development",
         apply: "serve",
-        enforce: "pre",
         configureServer(server) {
             let timer: ReturnType<typeof setTimeout> | undefined;
-            let lastWarning: string | undefined;
+            let activeError: ErrorPayload | undefined;
 
             let processor: ReturnType<typeof postcss>;
             try {
@@ -67,37 +84,69 @@ function verifyDevelopment(options: VerifyOptions): Plugin {
             const verifyLoadedStyles = async (): Promise<void> => {
                 timer = undefined;
                 if (styles.size === 0) {
+                    activeError = undefined;
                     return;
                 }
 
-                const css = Array.from(styles.values()).join("\n\n");
+                const sources = Array.from(styles);
+                const css = sources.map(([, code]) => code).join("\n\n");
 
                 try {
                     await processor.process(css, { from: undefined });
-                    lastWarning = undefined;
+                    activeError = undefined;
                 } catch (error) {
                     if (!(error instanceof Error)) {
                         server.config.logger.error(String(error));
                         return;
                     }
 
-                    const message = error.message;
-                    if (message === lastWarning) {
+                    const location =
+                        error instanceof CssSyntaxError
+                            ? sourceLocation(error, sources)
+                            : undefined;
+                    const reason =
+                        error instanceof CssSyntaxError
+                            ? error.reason
+                            : error.message;
+                    const preprocessed =
+                        location?.file &&
+                        /\.(?:sass|scss|less|styl|stylus)$/i.test(
+                            location.file,
+                        );
+                    let message = error.message;
+                    if (location) {
+                        const position = `${location.line}:${location.column}`;
+                        const source = preprocessed
+                            ? `${location.file} (processed CSS:${position})`
+                            : `${location.file}:${position}`;
+                        message = `${source}: ${reason}`;
+                    }
+                    if (message === activeError?.err.message) {
                         return;
                     }
 
                     server.config.logger.warn(message);
-                    server.ws.send({
+                    activeError = {
                         type: "error",
                         err: {
                             message,
                             stack: "",
                             plugin: "verify-variables:development",
+                            id: location?.file,
+                            loc: preprocessed ? undefined : location,
                         },
-                    });
-                    lastWarning = message;
+                    };
+                    if (server.ws.clients.size > 0) {
+                        server.ws.send(activeError);
+                    }
                 }
             };
+
+            server.ws.on("vite:client:connect", (_data, client) => {
+                if (activeError) {
+                    client.send(activeError);
+                }
+            });
 
             scheduleVerification = () => {
                 if (timer !== undefined) {
@@ -136,7 +185,8 @@ function verifyDevelopment(options: VerifyOptions): Plugin {
             if (
                 !/\.(?:css|pcss|postcss|sass|scss|less|styl|stylus)$/i.test(
                     cssId,
-                )
+                ) ||
+                /[?&](?:worker|sharedworker|raw|url)\b/.test(id)
             ) {
                 return;
             }

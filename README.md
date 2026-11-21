@@ -50,29 +50,6 @@ export default defineConfig({
 });
 ```
 
-<<<<<<< Updated upstream
-The Vite plugin checks generated CSS assets together after bundling, rather than checking each CSS module separately. It runs only during builds; CSS is not verified by the development server.
-
-### Vite sandbox
-
-The `vite-sandbox` npm workspace demonstrates the Vite plugin with a Vue button from `@fkui/vue`, the `@fkui/design` styles and `@fkui/theme-default`. It also uses variables declared in a separate CSS file. From the repository root, run:
-
-```sh
-npm install
-npm run build:plugin
-npm run dev --workspace vite-sandbox
-npm run build --workspace vite-sandbox
-npm exec --workspace vite-sandbox -- cypress install
-npm run e2e --workspace vite-sandbox
-```
-
-Build the local plugin before running the sandbox commands. The root `npm run build` also builds the sandbox to verify CSS variables; the development server does not perform verification.
-The Cypress end-to-end command tests the production preview; build the sandbox and install the Cypress binary first.
-
-=======
-
-> > > > > > > Stashed changes
-
 ## What is checked
 
 The plugin checks `var(--name)` references in declaration values against custom properties declared anywhere in the processed PostCSS root or in the [`global`](#global-compiled-css) option. Variables listed in [`ignore`](#ignoring-variables) are also allowed.
