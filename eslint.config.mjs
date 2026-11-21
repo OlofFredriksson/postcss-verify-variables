@@ -1,5 +1,6 @@
 import defaultConfig, { defineConfig } from "@forsakringskassan/eslint-config";
 import typescriptConfig from "@forsakringskassan/eslint-config-typescript";
+import vueConfig from "@forsakringskassan/eslint-config-vue";
 
 export default [
     defineConfig({
@@ -14,6 +15,7 @@ export default [
 
     ...defaultConfig,
     typescriptConfig(),
+    vueConfig(),
 
     {
         name: "Node Native test runner requires file extensions",

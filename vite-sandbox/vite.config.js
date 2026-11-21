@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 
+import vue from "@vitejs/plugin-vue";
 import { verifyVarsVite } from "postcss-verify-variables/vite";
 
 export default defineConfig({
@@ -8,5 +9,5 @@ export default defineConfig({
         __VUE_PROD_DEVTOOLS__: false,
         __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
     },
-    plugins: [verifyVarsVite()],
+    plugins: [vue(), verifyVarsVite()],
 });
