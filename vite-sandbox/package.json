@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "npm run build:plugin --prefix ..",
     "build": "npm run build:only",
     "build:only": "vite build",
     "predev": "npm run build:plugin --prefix ..",

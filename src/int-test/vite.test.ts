@@ -1,14 +1,14 @@
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type InlineConfig, build, createServer } from "vite";
+import { expect, test, vi } from "vitest";
 
-// eslint-disable-next-line import-x/no-unresolved, import-x/order -- The package is built before integration tests.
+// eslint-disable-next-line import-x/no-unresolved -- The package is built before integration tests.
 import { verifyVars } from "postcss-verify-variables";
-// eslint-disable-next-line import-x/no-unresolved, import-x/order -- The package is built before integration tests.
+// eslint-disable-next-line import-x/no-unresolved -- The package is built before integration tests.
 import { verifyVarsVite } from "postcss-verify-variables/vite";
-import { expect, test } from "vitest";
 
 const fixtureRoot = fileURLToPath(
     new URL("vite-boilerplate-app", import.meta.url),
@@ -49,6 +49,38 @@ function cssAssets(result: Awaited<ReturnType<typeof build>>): string[] {
             ? [asset.source]
             : [],
     );
+}
+
+type DevServer = Awaited<ReturnType<typeof createServer>>;
+
+async function withDevServer(
+    options: Parameters<typeof verifyVarsVite>[0],
+    run: (server: DevServer, root: string) => Promise<void>,
+    plugins: NonNullable<InlineConfig["plugins"]> = [],
+): Promise<void> {
+    const root = await mkdtemp(join(tmpdir(), "verify-variables-vite-"));
+    let server: DevServer | undefined;
+    try {
+        await cp(fixtureRoot, root, { recursive: true });
+        server = await createServer({
+            ...baseConfig,
+            root,
+            server: { port: 0 },
+            plugins: [verifyVarsVite(options), ...plugins],
+        });
+        await server.listen();
+        await run(server, root);
+    } finally {
+        try {
+            await server?.close();
+        } finally {
+            await rm(root, { recursive: true, force: true });
+        }
+    }
+}
+
+async function waitForDevCheck(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 test.each([false, true])(
@@ -115,36 +147,83 @@ test("Vite rejects multiple output configurations rather than checking them sepa
     );
 });
 
-test("Vite does not validate CSS or run a build in development", async () => {
-    const root = await mkdtemp(join(tmpdir(), "verify-variables-vite-"));
-    let server: Awaited<ReturnType<typeof createServer>> | undefined;
+test("Vite warns about undefined variables without failing development transforms or running a build", async () => {
     let builds = 0;
-    try {
-        await cp(fixtureRoot, root, { recursive: true });
-        server = await createServer({
-            ...baseConfig,
-            root,
-            server: { port: 0 },
-            plugins: [
-                verifyVarsVite(),
-                {
-                    name: "count-builds",
-                    apply: "build",
-                    buildStart() {
-                        builds++;
-                    },
+    await withDevServer(
+        {},
+        async (server, root) => {
+            const warn = vi.spyOn(server.config.logger, "warn");
+            const overlay = vi.spyOn(server.ws, "send");
+            const result = await server.transformRequest("/invalid.css");
+            expect(result?.code).toContain("var(--missing)");
+            await waitForDevCheck();
+            expect(warn).toHaveBeenCalled();
+            expect(String(warn.mock.calls[0][0])).toContain(
+                'CSS variable "--missing"',
+            );
+            const message = expect.stringContaining('CSS variable "--missing"');
+            const error = expect.objectContaining({ message });
+            const payload = expect.objectContaining({
+                type: "error",
+                err: error,
+            });
+            expect(overlay).toHaveBeenCalledWith(payload);
+
+            warn.mockClear();
+            overlay.mockClear();
+            await writeFile(
+                join(root, "variables.css"),
+                ":root { --missing: red; }",
+            );
+            await server.transformRequest("/variables.css");
+            await waitForDevCheck();
+            expect(warn).not.toHaveBeenCalled();
+            expect(overlay).not.toHaveBeenCalled();
+        },
+        [
+            {
+                name: "count-builds",
+                apply: "build",
+                buildStart() {
+                    builds++;
                 },
-            ],
-        });
-        await server.listen();
-        const result = await server.transformRequest("/invalid.css");
-        expect(result?.code).toContain("var(--missing)");
-        expect(builds).toBe(0);
-    } finally {
-        try {
-            await server?.close();
-        } finally {
-            await rm(root, { recursive: true, force: true });
-        }
-    }
+            },
+        ],
+    );
+    expect(builds).toBe(0);
 }, 30_000);
+
+test.each([
+    ["global", { global: ":root { --missing: red; }" }],
+    ["ignore", { ignore: ["--missing"] }],
+])("Vite honors %s for CSS in development", async (_name, options) => {
+    await withDevServer(options, async (server) => {
+        const warn = vi.spyOn(server.config.logger, "warn");
+        const overlay = vi.spyOn(server.ws, "send");
+        await server.transformRequest("/invalid.css");
+        await waitForDevCheck();
+        expect(warn).not.toHaveBeenCalled();
+        expect(overlay).not.toHaveBeenCalled();
+    });
+});
+
+test("Vite verifies a lazy stylesheet when it is loaded in development", async () => {
+    await withDevServer({}, async (server, root) => {
+        const warn = vi.spyOn(server.config.logger, "warn");
+        await writeFile(
+            join(root, "lazy.css"),
+            ".lazy { color: var(--lazy-missing); }",
+        );
+
+        await server.transformRequest("/main.js");
+        await waitForDevCheck();
+        expect(warn).not.toHaveBeenCalled();
+
+        await server.transformRequest("/lazy.js");
+        await waitForDevCheck();
+        expect(warn).toHaveBeenCalled();
+        expect(String(warn.mock.calls[0][0])).toContain(
+            'CSS variable "--lazy-missing"',
+        );
+    });
+});

@@ -50,6 +50,7 @@ export default defineConfig({
 });
 ```
 
+<<<<<<< Updated upstream
 The Vite plugin checks generated CSS assets together after bundling, rather than checking each CSS module separately. It runs only during builds; CSS is not verified by the development server.
 
 ### Vite sandbox
@@ -65,6 +66,10 @@ npm run e2e --workspace vite-sandbox
 
 The sandbox commands build the local plugin first. The root `npm run build` also builds the sandbox to verify CSS variables; the development server does not perform verification.
 The Cypress end-to-end command builds the sandbox, installs the Cypress binary if needed, and tests the production preview.
+
+=======
+
+> > > > > > > Stashed changes
 
 ## What is checked
 
