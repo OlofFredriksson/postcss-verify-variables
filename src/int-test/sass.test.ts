@@ -39,6 +39,21 @@ test("compiles Sass modules and verifies the resulting CSS", async () => {
     `);
 });
 
+test("finds variables declared in deeply nested Sass modules", async () => {
+    const { stdout } = await runBuild("deep");
+
+    expect(stdout).toMatchInlineSnapshot(`
+      ".component {
+        color: var(--deep-color);
+      }
+
+      :root {
+        --deep-color: #123456;
+      }
+      "
+    `);
+});
+
 test("fails the build for an undefined variable in compiled Sass", async () => {
     await expect(runBuild("invalid")).rejects.toMatchObject({
         stderr: expect.stringContaining(
