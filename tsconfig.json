@@ -4,8 +4,12 @@
         "noEmit": true,
         "module": "ESNext",
         "moduleResolution": "bundler",
-        "allowImportingTsExtensions": true
+        "allowImportingTsExtensions": true,
+        "paths": {
+            "postcss-verify-variables": ["./src/index.ts"],
+            "postcss-verify-variables/vite": ["./src/vite.ts"]
+        }
     },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+    "exclude": ["node_modules", "dist"]
 }
