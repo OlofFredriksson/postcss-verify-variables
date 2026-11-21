@@ -1,5 +1,7 @@
 import { type Plugin, type Root, parse } from "postcss";
 
+export const VERIFY_VARS_PLUGIN_NAME = "postcss-verify-variables-vars";
+
 /**
  * Configuration options for postcss-verify-variables-vars.
  */
@@ -42,7 +44,7 @@ function verifyVars(opts: VerifyOptions = {}): Plugin {
     }
 
     return {
-        postcssPlugin: "postcss-verify-variables-vars",
+        postcssPlugin: VERIFY_VARS_PLUGIN_NAME,
         Once(root) {
             const definedVars = new Set(globalDefinedVars);
             collectDefinedVars(root, definedVars);

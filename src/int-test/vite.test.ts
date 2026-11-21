@@ -1,9 +1,12 @@
-import { cp, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { cp, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type InlineConfig, build, createServer, normalizePath } from "vite";
-import { expect, test, vi } from "vitest";
+// eslint-disable-next-line import-x/no-extraneous-dependencies -- Provided by the Vue sandbox workspace.
+import vue from "@vitejs/plugin-vue";
+import { type MockInstance, expect, test, vi } from "vitest";
 
 // eslint-disable-next-line import-x/no-unresolved -- The package is built before integration tests.
 import { verifyVars } from "postcss-verify-variables";
@@ -53,12 +56,35 @@ function cssAssets(result: Awaited<ReturnType<typeof build>>): string[] {
 
 type DevServer = Awaited<ReturnType<typeof createServer>>;
 
+interface DevContext {
+    server: DevServer;
+    root: string;
+    warn: MockInstance<DevServer["config"]["logger"]["warn"]>;
+    overlay: MockInstance<DevServer["ws"]["send"]>;
+    connect: () => Promise<{ socket: WebSocket; messages: unknown[] }>;
+}
+
+function createDevContext(
+    server: DevServer,
+    root: string,
+    sockets: Set<WebSocket>,
+): DevContext {
+    return {
+        server,
+        root,
+        warn: vi.spyOn(server.config.logger, "warn"),
+        overlay: vi.spyOn(server.ws, "send"),
+        connect: () => connectDevClient(server, sockets),
+    };
+}
+
 async function withDevServer(
     options: Parameters<typeof verifyVarsVite>[0],
-    run: (server: DevServer, root: string) => Promise<void>,
+    run: (context: DevContext) => Promise<void>,
     plugins: NonNullable<InlineConfig["plugins"]> = [],
 ): Promise<void> {
     const root = await mkdtemp(join(tmpdir(), "verify-variables-vite-"));
+    const sockets = new Set<WebSocket>();
     let server: DevServer | undefined;
     try {
         await cp(fixtureRoot, root, { recursive: true });
@@ -69,9 +95,12 @@ async function withDevServer(
             plugins: [verifyVarsVite(options), ...plugins],
         });
         await server.listen();
-        await run(server, await realpath(root));
+        await run(createDevContext(server, await realpath(root), sockets));
     } finally {
         try {
+            for (const socket of sockets) {
+                socket.close();
+            }
             await server?.close();
         } finally {
             await rm(root, { recursive: true, force: true });
@@ -83,8 +112,22 @@ async function waitForDevCheck(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
+async function waitForWarning(warn: DevContext["warn"]): Promise<void> {
+    await vi.waitFor(() => expect(warn).toHaveBeenCalled(), { interval: 10 });
+}
+
+async function loadVariable(
+    server: DevServer,
+    root: string,
+    name: string,
+): Promise<void> {
+    await writeFile(join(root, "variables.css"), `:root { ${name}: red; }`);
+    await server.transformRequest("/variables.css");
+}
+
 async function connectDevClient(
     server: DevServer,
+    sockets: Set<WebSocket>,
 ): Promise<{ socket: WebSocket; messages: unknown[] }> {
     const url = server.resolvedUrls?.local[0];
     if (!url) {
@@ -92,6 +135,10 @@ async function connectDevClient(
     }
 
     const socket = new WebSocket(url.replace(/^http/, "ws"), "vite-hmr");
+    sockets.add(socket);
+    socket.addEventListener("close", () => sockets.delete(socket), {
+        once: true,
+    });
     const messages: unknown[] = [];
     socket.addEventListener("message", (event) => {
         messages.push(JSON.parse(String(event.data)) as unknown);
@@ -107,6 +154,27 @@ async function connectDevClient(
         );
     });
     return { socket, messages };
+}
+
+function expectOverlayError(
+    overlay: DevContext["overlay"],
+    error: unknown,
+): void {
+    expect(overlay).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error", err: error }),
+    );
+}
+
+async function expectCleanClientConnect(
+    connect: DevContext["connect"],
+    unexpected: unknown,
+): Promise<void> {
+    const client = await connect();
+    await vi.waitFor(() => {
+        expect(client.messages).toContainEqual({ type: "connected" });
+    });
+    await waitForDevCheck();
+    expect(client.messages).not.toContainEqual(unexpected);
 }
 
 test.each([false, true])(
@@ -138,6 +206,84 @@ test("the PostCSS plugin rejects variables declared in another Vite CSS module",
 
 test("Vite rejects an undefined variable in the generated CSS", async () => {
     await expect(buildInvalid()).rejects.toThrow('CSS variable "--missing"');
+});
+
+test("Vite reports the generated CSS asset and position in build errors", async () => {
+    await expect(buildInvalid()).rejects.toMatchObject({
+        message: expect.stringMatching(
+            /assets\/[^:\s]+\.css:1:\d+: CSS variable "--missing"/,
+        ),
+    });
+});
+
+test("Vite locates errors in later assets while checking variables across assets", async () => {
+    await expect(
+        build({
+            ...buildConfig,
+            plugins: [
+                verifyVarsVite(),
+                {
+                    name: "test-css-assets",
+                    generateBundle() {
+                        this.emitFile({
+                            type: "asset",
+                            fileName: "first-extra.css",
+                            source: ".first { color: var(--extra); }\n",
+                        });
+                        this.emitFile({
+                            type: "asset",
+                            fileName: "second-extra.css",
+                            source: ":root { --extra: red; }\n.second { color: var(--absent); }",
+                        });
+                    },
+                },
+            ],
+        }),
+    ).rejects.toMatchObject({
+        message: expect.stringContaining(
+            'second-extra.css:2:22: CSS variable "--absent"',
+        ),
+    });
+});
+
+test("Vite CLI reports a verification error without PostCSS stack frames", async () => {
+    const root = await mkdtemp(join(tmpdir(), "verify-variables-cli-"));
+    try {
+        const config = join(root, "vite.config.mjs");
+        const plugin = import.meta.resolve("postcss-verify-variables/vite");
+        await writeFile(
+            config,
+            `import { verifyVarsVite } from ${JSON.stringify(plugin)};
+export default {
+    plugins: [verifyVarsVite()],
+    build: { write: false, rolldownOptions: { input: ${JSON.stringify(join(fixtureRoot, "invalid.html"))} } }
+};`,
+        );
+        const vite = fileURLToPath(
+            new URL("../../bin/vite.js", import.meta.resolve("vite")),
+        );
+        const result = spawnSync(
+            process.execPath,
+            [vite, "build", fixtureRoot, "--config", config],
+            { encoding: "utf8" },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(1);
+        expect(result.stderr.match(/CSS variable "--missing"/g)).toHaveLength(
+            1,
+        );
+        expect(result.stderr).toContain("Declare the variable");
+        expect(result.stderr).not.toContain("at Input.error");
+        expect(result.stderr).not.toContain("at LazyResult");
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
+}, 30_000);
+
+test("Vite preserves unrelated CSS syntax errors", async () => {
+    await expect(buildInvalid({ global: "a {" })).rejects.toThrow(
+        "Unclosed block",
+    );
 });
 
 test.each([
@@ -177,14 +323,11 @@ test("Vite warns about undefined variables without failing development transform
     let builds = 0;
     await withDevServer(
         {},
-        async (server, root) => {
-            await connectDevClient(server);
-            const warn = vi.spyOn(server.config.logger, "warn");
-            const overlay = vi.spyOn(server.ws, "send");
+        async ({ server, root, warn, overlay, connect }) => {
+            await connect();
             const result = await server.transformRequest("/invalid.css");
             expect(result?.code).toContain("var(--missing)");
-            await waitForDevCheck();
-            expect(warn).toHaveBeenCalled();
+            await waitForWarning(warn);
             expect(String(warn.mock.calls[0][0])).toContain(
                 'CSS variable "--missing"',
             );
@@ -192,19 +335,11 @@ test("Vite warns about undefined variables without failing development transform
             const file = normalizePath(join(root, "invalid.css"));
             const loc = { file, line: 2, column: 16 };
             const error = expect.objectContaining({ message, id: file, loc });
-            const payload = expect.objectContaining({
-                type: "error",
-                err: error,
-            });
-            expect(overlay).toHaveBeenCalledWith(payload);
+            expectOverlayError(overlay, error);
 
             warn.mockClear();
             overlay.mockClear();
-            await writeFile(
-                join(root, "variables.css"),
-                ":root { --missing: red; }",
-            );
-            await server.transformRequest("/variables.css");
+            await loadVariable(server, root, "--missing");
             await waitForDevCheck();
             expect(warn).not.toHaveBeenCalled();
             expect(overlay).not.toHaveBeenCalled();
@@ -223,57 +358,44 @@ test("Vite warns about undefined variables without failing development transform
 }, 30_000);
 
 test("Vite verifies compiled Sass, including imported partials, with other stylesheets", async () => {
-    await withDevServer({}, async (server, root) => {
-        await connectDevClient(server);
-        await writeFile(join(root, "entry.scss"), '@use "partial";\n');
-        await writeFile(
-            join(root, "_partial.scss"),
-            ".example { color: var(--sass-missing); }\n",
-        );
-        const warn = vi.spyOn(server.config.logger, "warn");
-        const overlay = vi.spyOn(server.ws, "send");
+    await withDevServer(
+        {},
+        async ({ server, root, warn, overlay, connect }) => {
+            await connect();
+            await writeFile(join(root, "entry.scss"), '@use "partial";\n');
+            await writeFile(
+                join(root, "_partial.scss"),
+                ".example { color: var(--sass-missing); }\n",
+            );
+            const result = await server.transformRequest("/entry.scss");
+            expect(result?.code).toContain("var(--sass-missing)");
+            await waitForWarning(warn);
+            expect(String(warn.mock.calls[0][0])).toContain(
+                'CSS variable "--sass-missing"',
+            );
+            const error = expect.objectContaining({
+                id: normalizePath(join(root, "entry.scss")),
+                loc: undefined,
+                message: expect.stringContaining("(processed CSS:2:14)"),
+            });
+            expectOverlayError(overlay, error);
 
-        const result = await server.transformRequest("/entry.scss");
-        expect(result?.code).toContain("var(--sass-missing)");
-        await vi.waitFor(() => {
-            expect(warn).toHaveBeenCalled();
-        });
-        expect(String(warn.mock.calls[0][0])).toContain(
-            'CSS variable "--sass-missing"',
-        );
-        const error = expect.objectContaining({
-            id: normalizePath(join(root, "entry.scss")),
-            loc: undefined,
-            message: expect.stringContaining("(processed CSS:2:14)"),
-        });
-        expect(overlay).toHaveBeenCalledWith(
-            expect.objectContaining({ type: "error", err: error }),
-        );
-
-        await writeFile(
-            join(root, "variables.css"),
-            ":root { --sass-missing: red; }",
-        );
-        await server.transformRequest("/variables.css");
-        await waitForDevCheck();
-        const reconnected = await connectDevClient(server);
-        await vi.waitFor(() => {
-            expect(reconnected.messages).toContainEqual({ type: "connected" });
-        });
-        await waitForDevCheck();
-        expect(reconnected.messages).not.toContainEqual(
-            expect.objectContaining({ type: "error" }),
-        );
-    });
+            await loadVariable(server, root, "--sass-missing");
+            await waitForDevCheck();
+            await expectCleanClientConnect(
+                connect,
+                expect.objectContaining({ type: "error" }),
+            );
+        },
+    );
 }, 30_000);
 
 test("Vite rechecks compiled Sass after an imported partial changes", async () => {
-    await withDevServer({}, async (server, root) => {
-        await connectDevClient(server);
+    await withDevServer({}, async ({ server, root, warn, connect }) => {
+        await connect();
         const partial = join(root, "_partial.scss");
         await writeFile(join(root, "entry.scss"), '@use "partial";\n');
         await writeFile(partial, ".example { color: red; }\n");
-        const warn = vi.spyOn(server.config.logger, "warn");
         await server.transformRequest("/entry.scss");
         await waitForDevCheck();
         expect(warn).not.toHaveBeenCalled();
@@ -283,11 +405,14 @@ test("Vite rechecks compiled Sass after an imported partial changes", async () =
             const result = await server.transformRequest("/entry.scss");
             expect(result?.code).toContain("var(--changed)");
         });
-        await vi.waitFor(() => {
-            expect(warn).toHaveBeenCalledWith(
-                expect.stringContaining('CSS variable "--changed"'),
-            );
-        });
+        await vi.waitFor(
+            () => {
+                expect(warn).toHaveBeenCalledWith(
+                    expect.stringContaining('CSS variable "--changed"'),
+                );
+            },
+            { interval: 10 },
+        );
 
         await writeFile(partial, ".example { color: red; }\n");
         await vi.waitFor(async () => {
@@ -295,20 +420,15 @@ test("Vite rechecks compiled Sass after an imported partial changes", async () =
             expect(result?.code).not.toContain("var(--changed)");
         });
         await waitForDevCheck();
-        const client = await connectDevClient(server);
-        await vi.waitFor(() => {
-            expect(client.messages).toContainEqual({ type: "connected" });
-        });
-        await waitForDevCheck();
-        expect(client.messages).not.toContainEqual(
+        await expectCleanClientConnect(
+            connect,
             expect.objectContaining({ type: "error" }),
         );
     });
 }, 30_000);
 
 test("Vite does not verify CSS imported as raw text", async () => {
-    await withDevServer({}, async (server) => {
-        const warn = vi.spyOn(server.config.logger, "warn");
+    await withDevServer({}, async ({ server, warn }) => {
         const result = await server.transformRequest("/invalid.css?raw");
         expect(result?.code).toContain("var(--missing)");
         await waitForDevCheck();
@@ -316,42 +436,142 @@ test("Vite does not verify CSS imported as raw text", async () => {
     });
 });
 
+test("Vite verifies multiple Vue style blocks independently", async () => {
+    await withDevServer(
+        {},
+        async ({ server, root, warn, overlay, connect }) => {
+            await connect();
+            await writeFile(
+                join(root, "component.vue"),
+                `<template><div /></template>
+<style>.first { color: var(--vue-missing); }</style>
+<style>.second { color: red; }</style>`,
+            );
+            await server.transformRequest(
+                "/component.vue?vue&type=style&index=0&lang.css",
+            );
+            await server.transformRequest(
+                "/component.vue?vue&type=style&index=1&lang.css",
+            );
+            await waitForWarning(warn);
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('CSS variable "--vue-missing"'),
+            );
+            expectOverlayError(
+                overlay,
+                expect.objectContaining({
+                    id: expect.stringContaining(
+                        "component.vue?vue&type=style&index=0",
+                    ),
+                    loc: undefined,
+                    message: expect.stringContaining("(processed CSS:"),
+                }),
+            );
+
+            warn.mockClear();
+            server.watcher.emit("unlink", join(root, "component.vue"));
+            await server.transformRequest("/invalid.css");
+            await waitForWarning(warn);
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('CSS variable "--missing"'),
+            );
+        },
+        [vue()],
+    );
+});
+
+test("Vite checks Vue style blocks together", async () => {
+    await withDevServer(
+        {},
+        async ({ server, root, warn }) => {
+            await writeFile(
+                join(root, "component.vue"),
+                `<template><div /></template>
+<style>.first { color: var(--vue-color); }</style>
+<style>:root { --vue-color: red; }</style>`,
+            );
+            await server.transformRequest(
+                "/component.vue?vue&type=style&index=1&lang.css",
+            );
+            await server.transformRequest(
+                "/component.vue?vue&type=style&index=0&lang.css",
+            );
+            await waitForDevCheck();
+            expect(warn).not.toHaveBeenCalled();
+        },
+        [vue()],
+    );
+});
+
+test("Vite removes styles when their directory is unlinked", async () => {
+    await withDevServer({}, async ({ server, root, warn }) => {
+        await mkdir(join(root, "sub"));
+        await writeFile(
+            join(root, "sub", "variables.css"),
+            ":root { --missing: red; }",
+        );
+        await server.transformRequest("/sub/variables.css");
+        await server.transformRequest("/invalid.css");
+        await waitForDevCheck();
+        expect(warn).not.toHaveBeenCalled();
+
+        server.watcher.emit("unlinkDir", join(root, "sub"));
+        await waitForWarning(warn);
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining('CSS variable "--missing"'),
+        );
+    });
+});
+
+test("Vite cancels pending verification when a middleware server closes", async () => {
+    const server = await createServer({
+        ...baseConfig,
+        server: { middlewareMode: true },
+        plugins: [verifyVarsVite()],
+    });
+    const warn = vi.spyOn(server.config.logger, "warn");
+    try {
+        await server.transformRequest("/invalid.css");
+    } finally {
+        await server.close();
+    }
+    await waitForDevCheck();
+    expect(warn).not.toHaveBeenCalled();
+});
+
 test.each([
     ["without a final newline", ".first { color: red; }"],
     ["with a final newline", ".first { color: red; }\n"],
     ["with CRLF newlines", ".first {\r\n  color: red;\r\n}\r\n"],
 ])("Vite reports the source location after CSS %s", async (_name, first) => {
-    await withDevServer({}, async (server, root) => {
-        await connectDevClient(server);
-        await writeFile(join(root, "first.css"), first);
-        const second = normalizePath(join(root, "second.css"));
-        await writeFile(second, ".second {\n    color: var(--missing);\n}\n");
+    await withDevServer(
+        {},
+        async ({ server, root, warn, overlay, connect }) => {
+            await connect();
+            await writeFile(join(root, "first.css"), first);
+            const second = normalizePath(join(root, "second.css"));
+            await writeFile(
+                second,
+                ".second {\n    color: var(--missing);\n}\n",
+            );
 
-        const warn = vi.spyOn(server.config.logger, "warn");
-        const overlay = vi.spyOn(server.ws, "send");
-        await server.transformRequest("/first.css");
-        await server.transformRequest("/second.css");
-        await vi.waitFor(() => {
-            expect(warn).toHaveBeenCalled();
-        });
+            await server.transformRequest("/first.css");
+            await server.transformRequest("/second.css");
+            await waitForWarning(warn);
 
-        expect(String(warn.mock.calls[0][0])).toContain(`${second}:2:16:`);
-        const loc = { file: second, line: 2, column: 16 };
-        const err = expect.objectContaining({ id: second, loc });
-        expect(overlay).toHaveBeenCalledWith(
-            expect.objectContaining({ type: "error", err }),
-        );
-    });
+            expect(String(warn.mock.calls[0][0])).toContain(`${second}:2:16:`);
+            const loc = { file: second, line: 2, column: 16 };
+            const err = expect.objectContaining({ id: second, loc });
+            expectOverlayError(overlay, err);
+        },
+    );
 });
 
 test("Vite replays active CSS errors to reconnecting clients until fixed", async () => {
-    await withDevServer({}, async (server, root) => {
-        const warn = vi.spyOn(server.config.logger, "warn");
-        const initial = await connectDevClient(server);
+    await withDevServer({}, async ({ server, root, warn, connect }) => {
+        const initial = await connect();
         await server.transformRequest("/invalid.css");
-        await vi.waitFor(() => {
-            expect(warn).toHaveBeenCalled();
-        });
+        await waitForWarning(warn);
         await vi.waitFor(() => {
             expect(initial.messages).toContainEqual(
                 expect.objectContaining({ type: "error" }),
@@ -359,7 +579,7 @@ test("Vite replays active CSS errors to reconnecting clients until fixed", async
         });
         initial.socket.close();
 
-        const reconnected = await connectDevClient(server);
+        const reconnected = await connect();
         const error = expect.objectContaining({
             message: expect.stringContaining('CSS variable "--missing"'),
             id: normalizePath(join(root, "invalid.css")),
@@ -370,46 +590,24 @@ test("Vite replays active CSS errors to reconnecting clients until fixed", async
         });
         reconnected.socket.close();
 
-        await writeFile(
-            join(root, "variables.css"),
-            ":root { --missing: red; }",
-        );
-        await server.transformRequest("/variables.css");
+        await loadVariable(server, root, "--missing");
         await waitForDevCheck();
 
-        const fixed = await connectDevClient(server);
-        await vi.waitFor(() => {
-            expect(fixed.messages).toContainEqual({ type: "connected" });
-        });
-        await waitForDevCheck();
-        expect(fixed.messages).not.toContainEqual(payload);
-        fixed.socket.close();
+        await expectCleanClientConnect(connect, payload);
     });
 }, 30_000);
 
 test("Vite does not replay a corrected error reported before any client connects", async () => {
-    await withDevServer({}, async (server, root) => {
-        const warn = vi.spyOn(server.config.logger, "warn");
+    await withDevServer({}, async ({ server, root, warn, connect }) => {
         await server.transformRequest("/invalid.css");
-        await vi.waitFor(() => {
-            expect(warn).toHaveBeenCalled();
-        });
-        await writeFile(
-            join(root, "variables.css"),
-            ":root { --missing: red; }",
-        );
-        await server.transformRequest("/variables.css");
+        await waitForWarning(warn);
+        await loadVariable(server, root, "--missing");
         await waitForDevCheck();
 
-        const client = await connectDevClient(server);
-        await vi.waitFor(() => {
-            expect(client.messages).toContainEqual({ type: "connected" });
-        });
-        await waitForDevCheck();
-        expect(client.messages).not.toContainEqual(
+        await expectCleanClientConnect(
+            connect,
             expect.objectContaining({ type: "error" }),
         );
-        client.socket.close();
     });
 }, 30_000);
 
@@ -417,9 +615,7 @@ test.each([
     ["global", { global: ":root { --missing: red; }" }],
     ["ignore", { ignore: ["--missing"] }],
 ])("Vite honors %s for CSS in development", async (_name, options) => {
-    await withDevServer(options, async (server) => {
-        const warn = vi.spyOn(server.config.logger, "warn");
-        const overlay = vi.spyOn(server.ws, "send");
+    await withDevServer(options, async ({ server, warn, overlay }) => {
         await server.transformRequest("/invalid.css");
         await waitForDevCheck();
         expect(warn).not.toHaveBeenCalled();
@@ -428,8 +624,7 @@ test.each([
 });
 
 test("Vite verifies a lazy stylesheet when it is loaded in development", async () => {
-    await withDevServer({}, async (server, root) => {
-        const warn = vi.spyOn(server.config.logger, "warn");
+    await withDevServer({}, async ({ server, root, warn }) => {
         await writeFile(
             join(root, "lazy.css"),
             ".lazy { color: var(--lazy-missing); }",
@@ -440,8 +635,7 @@ test("Vite verifies a lazy stylesheet when it is loaded in development", async (
         expect(warn).not.toHaveBeenCalled();
 
         await server.transformRequest("/lazy.js");
-        await waitForDevCheck();
-        expect(warn).toHaveBeenCalled();
+        await waitForWarning(warn);
         expect(String(warn.mock.calls[0][0])).toContain(
             'CSS variable "--lazy-missing"',
         );
