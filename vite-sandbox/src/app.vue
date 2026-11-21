@@ -9,7 +9,7 @@ const clicks = ref(0);
 <template>
     <main>
         <h1>Vite sandbox</h1>
-        <p>Knappen har klickats {{ clicks }} gånger.</p>
-        <FButton variant="primary" size="medium" @click="clicks++"> Klicka här </FButton>
+        <p>Button clicks: {{ clicks }}</p>
+        <FButton variant="primary" size="medium" @click="clicks++"> Click here </FButton>
     </main>
 </template>
