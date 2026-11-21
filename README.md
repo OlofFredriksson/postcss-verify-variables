@@ -62,7 +62,7 @@ npm run dev --workspace vite-sandbox
 npm run build --workspace vite-sandbox
 ```
 
-The sandbox commands build the local plugin first. Run the sandbox build to verify CSS variables; the development server does not perform verification.
+The sandbox commands build the local plugin first. The root `npm run build` also builds the sandbox to verify CSS variables; the development server does not perform verification.
 
 ## What is checked
 
