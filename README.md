@@ -1,4 +1,4 @@
-# post-css-verify
+# postcss-verify-variables
 
 A PostCSS plugin that detects missing or misspelled CSS custom property references during a build.
 
@@ -7,7 +7,7 @@ A PostCSS plugin that detects missing or misspelled CSS custom property referenc
 Install the plugin and PostCSS in your project:
 
 ```sh
-npm install --save-dev post-css-verify postcss
+npm install --save-dev postcss-verify-variables postcss
 ```
 
 ## Usage
@@ -16,7 +16,7 @@ Add the plugin to a PostCSS pipeline:
 
 ```js
 import postcss from "postcss";
-import { verifyVars } from "post-css-verify";
+import { verifyVars } from "postcss-verify-variables";
 
 const css = `
     :root {
@@ -43,7 +43,7 @@ Add the plugin to `css.postcss.plugins` in your Vite configuration:
 
 ```js
 import { defineConfig } from "vite";
-import { verifyVars } from "post-css-verify";
+import { verifyVars } from "postcss-verify-variables";
 
 export default defineConfig({
     css: {
@@ -71,7 +71,7 @@ To check variables across files, place this plugin after plugins that import or 
 Use `ignore` for variables supplied at runtime or by CSS outside the processed root. Provide exact names, including the `--` prefix:
 
 ```js
-import { verifyVars } from "post-css-verify";
+import { verifyVars } from "postcss-verify-variables";
 
 export default {
     plugins: [
@@ -89,7 +89,7 @@ export default {
 Use `global` to provide compiled CSS whose variables will be available in the final build:
 
 ```js
-import { verifyVars } from "post-css-verify";
+import { verifyVars } from "postcss-verify-variables";
 
 export default {
     plugins: [

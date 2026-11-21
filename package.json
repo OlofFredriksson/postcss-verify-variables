@@ -1,5 +1,5 @@
 {
-  "name": "post-css-verify",
+  "name": "postcss-verify-variables",
   "version": "0.0.1",
   "private": true,
   "description": "Verify CSS custom property references with PostCSS",
