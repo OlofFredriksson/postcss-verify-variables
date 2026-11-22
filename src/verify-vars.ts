@@ -23,6 +23,11 @@ export interface VerifyOptions {
      * @defaultValue `""`
      */
     global?: string;
+
+    /**
+     * Text displayed before an undefined variable error message.
+     */
+    errorBanner?: string;
 }
 
 function collectDefinedVars(root: Root, definedVars: Set<string>): void {
@@ -62,6 +67,7 @@ function verifyVars(opts: VerifyOptions = {}): Plugin {
                     if (!definedVars.has(varName) && !ignore.has(varName)) {
                         throw decl.error(
                             [
+                                ...(opts.errorBanner ? [opts.errorBanner] : []),
                                 `CSS variable "${varName}" referenced in "${decl.prop}" could not be verified.`,
                                 'It is not declared in the processed CSS or "global" and is not listed in "ignore".',
                                 "Declare the variable in the processed CSS.",

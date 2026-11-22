@@ -85,3 +85,13 @@ verifyVars({
 ```
 
 `global` is optional and defaults to an empty string. It must contain valid CSS. Its custom property declarations count as defined, but text in comments or strings does not. References inside `global` itself are not checked.
+
+## Error banner
+
+Use the optional `errorBanner` string to display custom text on a separate line before an undefined variable error message:
+
+```js
+verifyVars({
+    errorBanner: "Check your project theme variables:",
+});
+```

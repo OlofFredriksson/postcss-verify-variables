@@ -1,10 +1,10 @@
 import postcss, { type Result } from "postcss";
 import { describe, expect, it } from "vitest";
-import verifyVars from "./verify-vars.ts";
+import verifyVars, { type VerifyOptions } from "./verify-vars.ts";
 
 const processCss = async (
     css: string,
-    options?: { ignore?: string[]; global?: string },
+    options?: VerifyOptions,
 ): Promise<Result> =>
     postcss([verifyVars(options)]).process(css, { from: undefined });
 
@@ -44,6 +44,32 @@ describe("verifyVars", () => {
                 "Declare the variable in the processed CSS.",
                 'If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore".',
             ].join("\n"),
+        });
+    });
+
+    it("displays the error banner before the verification message", async () => {
+        await expect(
+            processCss(".component { color: var(--missing); }", {
+                errorBanner: "Custom banner\nMore context",
+            }),
+        ).rejects.toMatchObject({
+            reason: [
+                "Custom banner\nMore context",
+                'CSS variable "--missing" referenced in "color" could not be verified.',
+                'It is not declared in the processed CSS or "global" and is not listed in "ignore".',
+                "Declare the variable in the processed CSS.",
+                'If it is defined elsewhere, provide its CSS via "global" or add its name to "ignore".',
+            ].join("\n"),
+        });
+    });
+
+    it("does not add a blank line for an empty error banner", async () => {
+        await expect(
+            processCss(".component { color: var(--missing); }", {
+                errorBanner: "",
+            }),
+        ).rejects.toMatchObject({
+            reason: expect.stringMatching(/^CSS variable "--missing"/),
         });
     });
 
