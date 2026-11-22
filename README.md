@@ -88,7 +88,7 @@ verifyVars({
 
 ## Error banner
 
-Use the optional `errorBanner` string to display custom text on a separate line before an undefined variable error message:
+Use the optional `errorBanner` string to display a custom message on a separate line before an undefined variable error:
 
 ```js
 verifyVars({

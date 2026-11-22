@@ -25,7 +25,7 @@ export interface VerifyOptions {
     global?: string;
 
     /**
-     * Text displayed before an undefined variable error message.
+     * Custom message displayed on a separate line before an undefined variable error.
      */
     errorBanner?: string;
 }
