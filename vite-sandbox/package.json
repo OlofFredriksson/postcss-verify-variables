@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fkui/design": "6.65.1",
-    "@fkui/theme-default": "6.65.0",
-    "@fkui/vue": "6.65.1",
+    "@fkui/design": "6.66.0",
+    "@fkui/theme-default": "6.66.0",
+    "@fkui/vue": "6.66.0",
     "vue": "3.5.45"
   },
   "devDependencies": {
